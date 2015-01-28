@@ -1,5 +1,7 @@
 package com.example.artangoopengl;
 
+//import com.projecttango.experiments.javamotiontracking.R;
+
 import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
@@ -9,15 +11,27 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.TextView;
 
 public class MainActivity extends Activity {
 
 	private MainView mView;
 	private WakeLock mWL;
+	private TextView mDeltaTextView;
+    private TextView mPoseCountTextView;
+    private TextView mPoseTextView;
+    private TextView mQuatTextView;
+    private TextView mPoseStatusTextView;
+    private TextView mTangoServiceVersionTextView;
+    private TextView mApplicationVersionTextView;
+    private TextView mTangoEventTextView;
+    private Button mMotionResetButton;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		
 		// full screen & full brightness
 		requestWindowFeature ( Window.FEATURE_NO_TITLE);
 		getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -25,7 +39,8 @@ public class MainActivity extends Activity {
 		mWL = ((PowerManager)getSystemService ( Context.POWER_SERVICE )).newWakeLock(PowerManager.FULL_WAKE_LOCK, "WakeLock");
 		mWL.acquire();
 		mView = new MainView(this);
-		setContentView ( mView );
+		setContentView(R.layout.activity_main);
+		//setContentView ( mView );
 	}
 
 	@Override
