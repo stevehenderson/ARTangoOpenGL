@@ -2,8 +2,18 @@ package com.example.artangoopengl;
 
 //import com.projecttango.experiments.javamotiontracking.R;
 
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+
 import com.google.atap.tangoservice.Tango;
 import com.google.atap.tangoservice.TangoConfig;
+import com.google.atap.tangoservice.TangoCoordinateFramePair;
+import com.google.atap.tangoservice.TangoErrorException;
+import com.google.atap.tangoservice.TangoEvent;
+import com.google.atap.tangoservice.TangoOutOfDateException;
+import com.google.atap.tangoservice.TangoPoseData;
+import com.google.atap.tangoservice.TangoXyzIjData;
+import com.google.atap.tangoservice.Tango.OnTangoUpdateListener;
 
 
 import android.app.Activity;
@@ -23,6 +33,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 public class MainActivity extends Activity {
 
@@ -119,6 +130,88 @@ public class MainActivity extends Activity {
         // Display the library version for debug purposes
         mTangoServiceVersionTextView.setText(mConfig.getString("tango_service_library_version"));
 	}
+	
+	 /**
+     * Set up the TangoConfig and the listeners for the Tango service, then begin using the Motion
+     * Tracking API. This is called in response to the user clicking the 'Start' Button.
+     */
+    private void setTangoListeners() {
+        // Lock configuration and connect to Tango
+        // Select coordinate frame pair
+        final ArrayList<TangoCoordinateFramePair> framePairs = 
+                new ArrayList<TangoCoordinateFramePair>();
+        framePairs.add(new TangoCoordinateFramePair(
+                TangoPoseData.COORDINATE_FRAME_START_OF_SERVICE,
+                TangoPoseData.COORDINATE_FRAME_DEVICE));
+        // Listen for new Tango data
+        mTango.connectListener(framePairs, new OnTangoUpdateListener() {
+
+            @Override
+            public void onPoseAvailable(final TangoPoseData pose) {
+                // Log whenever Motion Tracking enters a n invalid state
+                if (!mIsAutoRecovery && (pose.statusCode == TangoPoseData.POSE_INVALID)) {
+                    Log.w(TAG, "Invalid State");
+                }
+                if (mPreviousPoseStatus != pose.statusCode) {
+                    count = 0;
+                }
+                count++;
+                mPreviousPoseStatus = pose.statusCode;
+                mDeltaTime = (float) (pose.timestamp - mPreviousTimeStamp) * SECS_TO_MILLISECS;
+                mPreviousTimeStamp = (float) pose.timestamp;
+                // Update the OpenGL renderable objects with the new Tango Pose
+                // data
+                float[] translation = pose.getTranslationAsFloats();
+                
+                //TODO:  Update OpenGL camera pose
+
+                // Update the UI with TangoPose information
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        DecimalFormat threeDec = new DecimalFormat("0.000");
+                        String translationString = "[" + threeDec.format(pose.translation[0])
+                                + ", " + threeDec.format(pose.translation[1]) + ", "
+                                + threeDec.format(pose.translation[2]) + "] ";
+                        String quaternionString = "[" + threeDec.format(pose.rotation[0]) + ", "
+                                + threeDec.format(pose.rotation[1]) + ", "
+                                + threeDec.format(pose.rotation[2]) + ", "
+                                + threeDec.format(pose.rotation[3]) + "] ";
+
+                        // Display pose data on screen in TextViews
+                        mPoseTextView.setText(translationString);
+                        mQuatTextView.setText(quaternionString);
+                        mPoseCountTextView.setText(Integer.toString(count));
+                        mDeltaTextView.setText(threeDec.format(mDeltaTime));
+                        if (pose.statusCode == TangoPoseData.POSE_VALID) {
+                            mPoseStatusTextView.setText(R.string.pose_valid);
+                        } else if (pose.statusCode == TangoPoseData.POSE_INVALID) {
+                            mPoseStatusTextView.setText(R.string.pose_invalid);
+                        } else if (pose.statusCode == TangoPoseData.POSE_INITIALIZING) {
+                            mPoseStatusTextView.setText(R.string.pose_initializing);
+                        } else if (pose.statusCode == TangoPoseData.POSE_UNKNOWN) {
+                            mPoseStatusTextView.setText(R.string.pose_unknown);
+                        }
+                    }
+                });
+            }
+
+            @Override
+            public void onXyzIjAvailable(TangoXyzIjData arg0) {
+                // We are not using TangoXyzIjData for this application
+            }
+
+            @Override
+            public void onTangoEvent(final TangoEvent event) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        mTangoEventTextView.setText(event.eventKey + ": " + event.eventValue);
+                    }
+                });
+            }
+        });
+    }
 
 	@Override
 	protected void onPause() {
@@ -126,6 +219,11 @@ public class MainActivity extends Activity {
 			mWL.release();
 		mView.onPause();
 		super.onPause();
+		try {
+            mTango.disconnect();
+        } catch (TangoErrorException e) {
+            Toast.makeText(getApplicationContext(), R.string.TangoError, Toast.LENGTH_SHORT).show();
+        }
 	}
 
 	@Override
@@ -133,5 +231,49 @@ public class MainActivity extends Activity {
 		super.onResume();
 		mView.onResume();
 		mWL.acquire();
+		try {
+            setTangoListeners();
+        } catch (TangoErrorException e) {
+            Toast.makeText(getApplicationContext(), R.string.TangoError, Toast.LENGTH_SHORT).show();
+        } catch (SecurityException e) {
+            Toast.makeText(getApplicationContext(), R.string.motiontrackingpermission,
+                    Toast.LENGTH_SHORT).show();
+        }
+        try {
+            mTango.connect(mConfig);
+        } catch (TangoOutOfDateException e) {
+            Toast.makeText(getApplicationContext(), R.string.TangoOutOfDateException,
+                    Toast.LENGTH_SHORT).show();
+        } catch (TangoErrorException e) {
+            Toast.makeText(getApplicationContext(), R.string.TangoError, Toast.LENGTH_SHORT).show();
+        }
+        try {
+            setUpExtrinsics();
+        } catch (TangoErrorException e) {
+            Toast.makeText(getApplicationContext(), R.string.TangoError, Toast.LENGTH_SHORT).show();
+        } catch (SecurityException e) {
+            Toast.makeText(getApplicationContext(), R.string.motiontrackingpermission,
+                    Toast.LENGTH_SHORT).show();
+        }
 	}
+	
+	private void setUpExtrinsics() {
+        // Get device to imu matrix.
+        TangoPoseData device2IMUPose = new TangoPoseData();
+        TangoCoordinateFramePair framePair = new TangoCoordinateFramePair();
+        framePair.baseFrame = TangoPoseData.COORDINATE_FRAME_IMU;
+        framePair.targetFrame = TangoPoseData.COORDINATE_FRAME_DEVICE;
+        device2IMUPose = mTango.getPoseAtTime(0.0, framePair);
+       // mRenderer.getModelMatCalculator().SetDevice2IMUMatrix(
+       //         device2IMUPose.getTranslationAsFloats(), device2IMUPose.getRotationAsFloats());
+
+        // Get color camera to imu matrix.
+        TangoPoseData color2IMUPose = new TangoPoseData();
+        framePair.baseFrame = TangoPoseData.COORDINATE_FRAME_IMU;
+        framePair.targetFrame = TangoPoseData.COORDINATE_FRAME_CAMERA_COLOR;
+        color2IMUPose = mTango.getPoseAtTime(0.0, framePair);
+
+       // mRenderer.getModelMatCalculator().SetColorCamera2IMUMatrix(
+        //        color2IMUPose.getTranslationAsFloats(), color2IMUPose.getRotationAsFloats());
+    }
 }
