@@ -21,13 +21,19 @@
             android:name="com.projecttango.libtango_device"
             android:required="true" /> 
         <activity
-            android:name=".MainActivity"
-            android:label="@string/app_name" >
+            android:name="com.example.artangoopengl.StartActivity"
+            android:label="@string/menu_name"
+            android:screenOrientation="landscape"
+            android:icon="@drawable/ic_launcher">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+        <activity
+            android:name="com.example.artangoopengl.MainActivity"
+        	android:label="@string/app_name" 
+            android:screenOrientation="landscape"> 
         </activity>
     </application>
 
